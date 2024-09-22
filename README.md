@@ -15,7 +15,6 @@ export SCW_SECRET_KEY=""
 
 # General project informations
 export SCW_DEFAULT_ORGANIZATION_ID=""
-export SCW_DEFAULT_PROJECT_ID=""
 export SCW_DEFAULT_REGION=""
 export SCW_DEFAULT_ZONE=""
 ```
@@ -71,7 +70,9 @@ go run automation/cmd/down/main.go
 We use argocd as source of truth for application that are deployed in the cluster. 
 So it is deployed first and updated later to expose it's ingress.
 
-# 1. Install HA ArgoCD
+> [!WARNING] This section is in WIP
+
+## 1. Install HA ArgoCD
 
 To inspect what config values was modified use thoses commands:
 
@@ -116,7 +117,7 @@ And then install argocd with:
 make install-argocd
 ```
 
-# 2. Apply ArgoCD requirements applications
+## 2. Apply ArgoCD requirements applications
 
 Deploy requirements application and get nginx external ip:
 ```bash
@@ -126,7 +127,7 @@ make get-nginx-external-ip
 xxx.xxx.xxx.xxx
 ```
 
-# 3. Update ArgoCD with ingress external ip
+## 3. Update ArgoCD with ingress external ip
 
 Update ArgoCD `values.yaml` file to update the ingress value:
 ```yaml
@@ -148,9 +149,7 @@ Then update argocd deployment:
 make update-argocd
 ```
 
-# 4. Required: S3 Storage
-
-## On scaleway
+## 4. Required: S3 Storage (On Scaleway)
 
 For the LGTM stack to work you will need S3 buckets and credentials:
 
@@ -198,7 +197,7 @@ kubectl apply -f secret.yaml -n mimir
 kubectl apply -f secret.yaml -n tempo
 ```
 
-# 5. Deploy the monitoring stack
+## 5. Deploy the monitoring stack
 
 > [!NOTE]
 > A makefile command `make template-applications` is available to make this process more easy
@@ -217,7 +216,7 @@ export TEMPO_BUCKET_NAME=""
 
 Run the template makefile command:
 ```bash
-make tempalte-applications
+make template-applications
 ```
 
 You should endup with templated files for grafana, mimir, loki and tempo in `/apps/lgtm/`
@@ -227,7 +226,7 @@ Run the make file command to deploy the monitoring stack:
 make deploy-lgtm
 ```
 
-# 5. Access dashboards
+## 6. Access dashboards
 
 You get access to grafana dashboards via the url: `grafana.<ip>.nip.io`. User and Password is: `admin`
 
