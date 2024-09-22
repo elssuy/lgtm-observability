@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: security
+spec:
+  project: default
+  source:
+    repoURL: https://kyverno.github.io/kyverno/
+    chart: kyverno-policies
+    targetRevision: 3.2.*
+    helm:
+      values: |
+        skipBackgroundRequests: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno-policies
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

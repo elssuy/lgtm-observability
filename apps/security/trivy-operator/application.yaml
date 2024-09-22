@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trivy-operator
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: security
+spec:
+  project: default
+  source:
+    repoURL: https://aquasecurity.github.io/helm-charts/
+    chart: trivy-operator
+    targetRevision: 0.24.*
+    helm:
+      values: |
+        serviceMonitor:
+          enabled: true
+        operator:
+          scanJobsConcurrentLimit: 3
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: trivy-system
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

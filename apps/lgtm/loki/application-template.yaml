@@ -1,0 +1,265 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: lgtm
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 6.10.*
+    helm:
+      values: |
+        global:
+          dnsService: coredns
+        loki:
+          storage:
+            bucketNames:
+              chunks: {{.LokiBucketName}}
+              ruler: {{.LokiBucketName}}
+              admin: {{.LokiBucketName}}
+            type: s3
+            s3:
+              endpoint: s3.fr-par.scw.cloud
+              region: fr-par
+              secret_access_key: "${AWS_SECRET_ACCESS_KEY}" # This is a secret injected via an environment variable
+              access_key_id: "${AWS_ACCESS_KEY_ID}" # This is a secret injected via an environment variable
+          compactor:
+            retention_enabled: false
+            delete_request_store: s3
+          limits_config:
+            allow_structured_metadata: true
+            split_queries_by_interval: 20m
+            ## Customs added from https://github.com/grafana/loki/issues/4204
+            retention_period: 0 # 30d
+            reject_old_samples: true
+            reject_old_samples_max_age: 6h
+            max_cache_freshness_per_query: 10m
+            per_stream_rate_limit: 128M
+            per_stream_rate_limit_burst: 256M
+            ingestion_rate_mb: 128
+            ingestion_burst_size_mb: 256
+            ##
+          pattern_ingester:
+            enabled: true
+          auth_enabled: true
+          schemaConfig:
+            configs:
+              - from: 2024-04-01
+                store: tsdb
+                object_store: s3
+                schema: v13
+                index:
+                  prefix: loki_index_
+                  period: 24h
+          ingester:
+            chunk_encoding: snappy
+          tracing:
+            enabled: true
+          querier:
+            max_concurrent: 4
+          server:
+            grpc_server_max_recv_msg_size: 8388608
+            grpc_server_max_send_msg_size: 8388608
+
+        deploymentMode: Distributed
+
+        monitoring:
+          dashboards:
+            enabled: true
+            annotations:
+              k8s-sidecar-target-directory: "/tmp/dashboards/Loki Dashboards"
+          rules: 
+            enabled: true
+          serviceMonitor:
+            enabled: true
+
+        backend:
+          replicas: 0
+          affinity: {}
+        read:
+          replicas: 0
+          affinity: {}
+        write:
+          replicas: 0
+          affinity: {}
+
+        patternIngester:
+          replicas: 1
+          affinity: {}
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy-cluster.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+        ruler:
+          replicas: 1
+          affinity: {}
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        # Enable minio for storage
+        minio:
+          enabled: false
+
+        # Zero out replica counts of other deployment modes
+        singleBinary:
+          replicas: 0
+
+        chunksCache:
+          enabled: true
+          replicas: 2
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          allocatedMemory: 2048
+
+        ingester:
+          replicas: 3
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+          zoneAwareReplication:
+            enabled: false
+          affinity: {}
+        
+        querier:
+          affinity: []
+          topologySpreadConstraints: []
+          replicas: 5
+          maxUnavailable: 1
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        queryFrontend:
+          affinity: []
+          replicas: 3
+          maxUnavailable: 1
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        queryScheduler:
+          affinity: []
+          replicas: 2
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        distributor:
+          replicas: 3
+          maxUnavailable: 1
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        compactor:
+          replicas: 1
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        indexGateway:
+          replicas: 2
+          maxUnavailable: 1
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom:
+            - secretRef: 
+                name: s3-credentials
+
+        bloomCompactor:
+          replicas: 0
+        bloomGateway:
+          replicas: 0
+        gateway:
+          enabled: true
+          ingress:
+            enabled: true
+            ingressClass: nginx
+            hosts:
+              - host: "loki.{{.TLD}}"
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls:
+              - secretName: loki-tls
+                hosts:
+                  - "loki.{{.TLD}}"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: loki
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true

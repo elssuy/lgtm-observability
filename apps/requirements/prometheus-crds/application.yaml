@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-crds
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: requirements
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-operator-crds
+    targetRevision: 13.0.*
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

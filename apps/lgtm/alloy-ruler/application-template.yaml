@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alloy-rules
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: lgtm
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 0.6.*
+    helm:
+      values: |
+        serviceMonitor:
+          enabled: true
+        controller:
+          type: deployment
+          replicas: 1
+          updateStrategy:
+            type: RollingUpdate
+            rollingUpdate:
+              maxSurge: 1
+              maxUnavailable: 0
+        alloy:
+          clustering:
+            enabled: true
+          configMap:
+            create: true
+            content: |
+
+              ////
+              // Rules 
+              ////
+
+              mimir.rules.kubernetes "rules" {
+                address ="http://mimir-gateway.mimir" 
+                tenant_id = "admin"
+              }
+
+              loki.rules.kubernetes "rules" {
+                address = "http://loki-gateway.loki"
+                tenant_id = "admin"
+                rule_selector {
+                  match_labels = {
+                    type = "loki",
+                  }
+                }
+              }
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: k8s-monitoring
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true
+
+

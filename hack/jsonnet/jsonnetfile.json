@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "dependencies": [
+    {
+      "source": {
+        "git": {
+          "remote": "https://github.com/grafana/tempo.git",
+          "subdir": "operations/tempo-mixin"
+        }
+      },
+      "version": "main"
+    },
+    {
+      "source": {
+        "git": {
+          "remote": "https://github.com/kubernetes-monitoring/kubernetes-mixin.git",
+          "subdir": ""
+        }
+      },
+      "version": "master"
+    },
+    {
+      "source": {
+        "git": {
+          "remote": "https://github.com/prometheus-operator/kube-prometheus.git",
+          "subdir": ""
+        }
+      },
+      "version": "main"
+    }
+  ],
+  "legacyImports": true
+}

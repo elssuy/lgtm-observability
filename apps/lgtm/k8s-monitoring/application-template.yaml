@@ -1,0 +1,117 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: k8s-monitoring
+    targetRevision: 1.4.2
+    helm:
+      values: |
+        cluster: 
+          name: admin
+
+        externalServices:
+          prometheus:
+            host: http://mimir-gateway.mimir
+            queryEndpoint: /api/v1/query
+            writeEndpoint: /api/v1/push
+            authMode: none
+            tenantId: admin
+          loki:
+            host: http://loki-gateway.loki
+            authMode: none
+            tenantId: admin
+          tempo:
+            host: http://tempo-distributor.tempo:4317
+            authMode: none
+            tenantId: admin
+            tls:
+              insecure: true
+              insecure_skip_verify: true
+
+
+        metrics:
+          scrapeInterval: 15s
+          # Warning: might work better if we configure on dashboard generation
+          # 
+          # cadvisor:
+          #   extraMetricRelabelingRules: |-
+          #     rule {
+          #       target_label = "job"
+          #       replacement = "cadvisor"
+          #     }
+          # kube-state-metrics:
+          #   extraMetricRelabelingRules: |-
+          #     rule {
+          #       target_label = "job"
+          #       replacement = "kube-state-metrics"
+          #     }
+          alloy:
+            metricsTuning:
+              useIntegrationAllowList: true
+          node-exporter:
+            metricsTuning:
+              useIntegrationAllowList: true
+          cost:
+            enabled: false
+          probles:
+            enabled: false
+          alloyModules:
+            connections:
+              - alias: grafana
+                repository: https://github.com/grafana/alloy-modules.git
+                revision: main
+                pull_frequency: 15m
+                default: true
+            modules:
+              - name: memcached
+                path: modules/databases/kv/memcached/metrics.alloy
+              - name: loki
+                path: modules/databases/timeseries/loki/metrics.alloy
+              - name: mimir
+                path: modules/databases/timeseries/mimir/metrics.alloy
+              - name: tempo
+                path: modules/databases/timeseries/tempo/metrics.alloy
+              - name: grafana
+                path: modules/ui/grafana/metrics.alloy
+          cost:
+            enabled: false
+
+        traces:
+          enabled: true
+
+        receivers:
+          jaeger:
+            grpc:
+              enabled: true
+            thriftBinary:
+              enabled: true
+            thriftCompact:
+              enabled: true
+            thriftHttp:
+              enabled: true
+          grafanaCloudMetrics:
+            enabled: false
+          deployGrafanaAgentService: false
+
+        opencost:
+          enabled: false
+
+        prometheus-operator-crds:
+          enabled: false
+
+        alloy:
+          controller:
+            replicas: 3
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: k8s-monitoring
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

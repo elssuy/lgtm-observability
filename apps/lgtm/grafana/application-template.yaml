@@ -1,0 +1,193 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: lgtm
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    targetRevision: 8.4.*
+    helm:
+      values: |
+        ingress:
+          enabled: true
+          hosts:
+            - grafana.{{.TLD}}
+        adminUser: admin
+        adminPassword: admin
+        sidecar:
+          dashboards:
+            enabled: true
+            searchNamespace: ALL
+            provider:
+              foldersFromFilesStructure: true
+        plugins:
+          - grafana-lokiexplore-app
+        dashboardProviders:
+          dashboardproviders.yaml:
+            apiVersion: 1
+            providers:
+            - name: 'alloy'
+              orgId: 1
+              folder: 'Alloy'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/alloy
+            - name: 'kubernetes'
+              orgId: 1
+              folder: 'Kubernetes'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/kubernetes
+            - name: 'nginx'
+              orgId: 1
+              folder: 'Nginx'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/nginx
+            - name: 'security'
+              orgId: 1
+              folder: 'Security'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/security
+            - name: 'default'
+              orgId: 1
+              folder: ''
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/default
+        dashboards:
+          security:
+            trivy-operator-dashboard:
+              gnetId: 17813
+          nginx:
+            nginx-detailed:
+              gnetId: 14314
+          kubernetes:
+            node-exporter:
+              gnetId: 1860
+            k8s-addons-prometheus:
+              gnetId: 19105
+            k8s-addons-trivy-operator:
+              gnetId: 16337
+            k8s-system-api-server:
+              gnetId: 15761
+            k8s-system-coredns:
+              gnetId: 15762
+            k8s-views-global:
+              gnetId: 15757
+            k8s-views-namespaces:
+              gnetId: 15758
+            k8s-views-nodes:
+              gnetId: 15759
+            k8s-views-pods:
+              gnetId: 15760
+          alloy:
+            alloy-resources: 
+              url: "https://raw.githubusercontent.com/grafana/meta-monitoring-chart/main/charts/meta-monitoring/src/dashboards/alloy-resources.json"
+            alloy-prometheus: 
+              url: "https://raw.githubusercontent.com/grafana/meta-monitoring-chart/main/charts/meta-monitoring/src/dashboards/alloy-prometheus.json"
+            alloy-opentelemetry: 
+              url: "https://raw.githubusercontent.com/grafana/meta-monitoring-chart/main/charts/meta-monitoring/src/dashboards/alloy-opentelemetry.json"
+            alloy-controller: 
+              url: "https://raw.githubusercontent.com/grafana/meta-monitoring-chart/main/charts/meta-monitoring/src/dashboards/alloy-controller.json"
+            alloy-cluster-overview: 
+              url: "https://raw.githubusercontent.com/grafana/meta-monitoring-chart/main/charts/meta-monitoring/src/dashboards/alloy-cluster-overview.json"
+            alloy-cluster-node: 
+              url: "https://raw.githubusercontent.com/grafana/meta-monitoring-chart/main/charts/meta-monitoring/src/dashboards/alloy-cluster-node.json"
+        datasources:
+          datasources.yaml: 
+            apiVersion: 1
+            datasources:
+            - name: AlertManager
+              type: alertmanager
+              url: http://mimir-gateway.mimir/
+              access: proxy
+              jsonData:
+                httpHeaderName1: 'X-Scope-OrgID'
+                implementation: mimir
+              secureJsonData:
+                httpHeaderValue1: 'admin'
+            - name: Tempo
+              type: tempo
+              url: http://tempo-gateway.tempo/
+              access: proxy
+              jsonData:
+                httpHeaderName1: 'X-Scope-OrgID'
+                tracesToMetrics:
+                  datasourceUid: 'Mimir'
+                  tags:
+                    - { key: 'service.name', value: 'service' }
+                    - { key: 'job' }
+                    - cluster
+                    - namespace
+                    - pod
+                    - service
+                tracesToLogsV2:
+                  datasourceUid: 'Loki'
+                  filterByTraceID: true
+                  filterBySpanID: true
+                lokiSearch:
+                  datasourceUid: 'Loki'
+                serviceMap:
+                  datasourceUid: 'Mimir'
+                nodeGraph:
+                  enabled: true
+                spanBar:
+                  type: 'Tag'
+                  tag: 'http.path'
+              secureJsonData:
+                httpHeaderValue1: 'admin'
+            - name: Loki
+              type: loki
+              url: http://loki-gateway.loki/
+              access: proxy
+              jsonData:
+                httpHeaderName1: 'X-Scope-OrgID'
+                derivedFields:
+                  # Field with internal link pointing to data source in Grafana.
+                  - datasourceUid: Tempo
+                    matcherRegex: "traceID=(\\w+)"
+                    name: TraceID
+                    # url will be interpreted as query for the datasource
+                    url: '$${__value.raw}'
+                    # optional for URL Label to set a custom display label for the link.
+                    urlDisplayLabel: 'View Trace'
+              secureJsonData:
+                httpHeaderValue1: 'admin'
+            - name: Mimir
+              type: prometheus
+              url: http://mimir-gateway.mimir/prometheus
+              access: proxy
+              jsonData:
+                httpHeaderName1: 'X-Scope-OrgID'
+                prometheusType: Mimir
+                exemplarTraceIdDestinations:
+                  - datasourceUid: Tempo
+                    name: traceID
+              secureJsonData:
+                httpHeaderValue1: 'admin'
+              isDefault: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: grafana
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true

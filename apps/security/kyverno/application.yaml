@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: security
+spec:
+  project: default
+  source:
+    repoURL: https://kyverno.github.io/kyverno/
+    chart: kyverno
+    targetRevision: 3.2.*
+    helm:
+      values: |
+        admissionController:
+          serviceMonitor:
+            enabled: true
+        backgroundController:
+          serviceMonitor:
+            enabled: true
+        cleanupController:
+          serviceMonitor:
+            enabled: true
+        reportsController:
+          serviceMonitor:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

@@ -1,0 +1,167 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mimir
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: lgtm
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: mimir-distributed
+    targetRevision: 5.4.*
+    helm:
+      values: |
+        continuous_test:
+          enabled: true
+        mimir:
+          structuredConfig:
+            common:
+              storage:
+                backend: s3
+                s3:
+                  endpoint: s3.fr-par.scw.cloud
+                  region: fr-par
+                  secret_access_key: "${AWS_SECRET_ACCESS_KEY}" # This is a secret injected via an environment variable
+                  access_key_id: "${AWS_ACCESS_KEY_ID}" # This is a secret injected via an environment variable
+
+            blocks_storage:
+              s3:
+                bucket_name: {{.MimirBlockBucketName}}
+            alertmanager_storage:
+              s3:
+                bucket_name: {{.MimirAlertManagerBucketName}}
+            ruler_storage:
+              s3:
+                bucket_name: {{.MimirRulerBucketName}}
+
+            limits:
+              out_of_order_time_window: 5m
+              max_global_exemplars_per_user: 50000
+              max_global_series_per_user: 500000
+              compactor_blocks_retention_period: 30d
+              ingestion_rate: 100000
+              ingestion_burst_size: 500000 
+              native_histograms_ingestion_enabled: true
+              max_native_histogram_buckets: 160
+        global:
+          dnsService: coredns
+          extraEnv:
+            - name: JAEGER_AGENT_HOST
+              value: "k8s-monitoring-alloy.k8s-monitoring"
+            - name: JAEGER_SAMPLER_TYPE
+              value: "const"
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
+          extraEnvFrom: 
+            - secretRef: 
+                name: s3-credentials
+        metaMonitoring:
+          dashboards:
+            enabled: true
+          serviceMonitor:
+            enabled: true
+            interval: 15s
+            clusterLabel: admin
+          prometheusRule:
+            enabled: true
+            mimirAlerts: true
+            mimirRules: true
+          dashboard:
+            enabled: false
+        enterprise:
+          enabled: false
+        alertmanager:
+          persistentVolume:
+            enabled: true
+          replicas: 2
+          statefulSet:
+            enabled: true
+
+        compactor:
+          persistentVolume:
+            size: 80Gi
+
+        distributor:
+          replicas: 3
+
+        ingester:
+          persistentVolume:
+            size: 50Gi
+          replicas: 3
+          zoneAwareReplication:
+            enabled: false
+
+
+        admin-cache:
+          enabled: false
+          replicas: 1
+
+        chunks-cache:
+          enabled: false
+          replicas: 1
+
+        index-cache:
+          enabled: false
+          replicas: 1
+
+        metadata-cache:
+          enabled: false
+
+        results-cache:
+          enabled: false
+          replicas: 1
+
+        minio:
+          enabled: false
+          replicas: 1
+
+        overrides_exporter:
+          replicas: 1
+
+        querier:
+          replicas: 1
+
+        query_frontend:
+          replicas: 1
+
+        ruler:
+          replicas: 1
+
+        store_gateway:
+          persistentVolume:
+            size: 10Gi
+          replicas: 3
+          zoneAwareReplication:
+            enabled: false
+
+        gateway:
+          replicas: 1
+          enabledNonEnterprise: true
+          ingress:
+            enabled: true
+            ingressClass: nginx
+            hosts:
+              - host: "mimir.{{.TLD}}"
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls:
+              - secretName: mimir-tls
+                hosts:
+                  - "mimir.{{.TLD}}"
+
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mimir
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true
+
+

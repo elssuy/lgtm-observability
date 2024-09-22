@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tetragon
+  namespace: argocd
+  labels:
+    cluster: admin
+    type: security
+spec:
+  project: default
+  source:
+    repoURL: https://helm.cilium.io
+    chart: tetragon
+    targetRevision: 1.1.*
+    helm:
+      values: |
+        tetragon:
+          prometheus:
+            serviceMonitor:
+              enabled: true
+        tetragonOperator:
+          prometheus:
+            serviceMonitor:
+              enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
