@@ -1,13 +1,21 @@
 # Demo Deployment - Scaleway
 
-The demo deployment uses pulumi, golang, and scaleway cloud. You need to setup your pulumi backend first.
-This backend can be local: `file:///path/to/your/local/backend`
+The demo deployment uses pulumi, golang, and scaleway cloud.
+You will need to install pulumi, see [here](https://www.pulumi.com/docs/iac/download-install/):
+
+```bash
+# install pulumi in ~/.pulumi/bin
+curl -fsSL https://get.pulumi.com | sh
+
+# add ~/.pulumi/bin to your $PATH variable
+```
 
 Setup environment variables:
 
 ```bash
 # Pulumi backend
 export PULUMI_BACKEND_URL="file:///path/to/your/local/backend/folder"
+export PULUMI_CONFIG_PASSPHRASE="yourpassphrase"
 
 # API Credentials
 export SCW_ACCESS_KEY=""
