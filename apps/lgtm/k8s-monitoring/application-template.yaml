@@ -8,105 +8,77 @@ spec:
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: k8s-monitoring
-    targetRevision: 1.4.2
+    targetRevision: 2.0.0-rc.3
     helm:
       values: |
         cluster: 
           name: admin
 
-        externalServices:
-          prometheus:
-            host: http://mimir-gateway.mimir
-            queryEndpoint: /api/v1/query
-            writeEndpoint: /api/v1/push
-            authMode: none
+        destinations:
+          - name: prometheus
+            type: prometheus
+            url: http://mimir-gateway.mimir/api/v1/push
             tenantId: admin
-          loki:
-            host: http://loki-gateway.loki
-            authMode: none
+          - name: loki
+            type: loki
+            url: http://loki-gateway.loki/loki/api/v1/push
             tenantId: admin
-          tempo:
-            host: http://tempo-distributor.tempo:4317
-            authMode: none
-            tenantId: admin
-            tls:
-              insecure: true
-              insecure_skip_verify: true
+          - name: tempo
+            type: otlp
+            url: http://tempo-distributor.tempo:4317/v1/traces
+            traces:  { enabled: true }
 
-
-        metrics:
-          scrapeInterval: 15s
-          # Warning: might work better if we configure on dashboard generation
-          # 
-          # cadvisor:
-          #   extraMetricRelabelingRules: |-
-          #     rule {
-          #       target_label = "job"
-          #       replacement = "cadvisor"
-          #     }
-          # kube-state-metrics:
-          #   extraMetricRelabelingRules: |-
-          #     rule {
-          #       target_label = "job"
-          #       replacement = "kube-state-metrics"
-          #     }
-          alloy:
-            metricsTuning:
-              useIntegrationAllowList: true
-          node-exporter:
-            metricsTuning:
-              useIntegrationAllowList: true
-          cost:
-            enabled: false
-          probles:
-            enabled: false
-          alloyModules:
-            connections:
-              - alias: grafana
-                repository: https://github.com/grafana/alloy-modules.git
-                revision: main
-                pull_frequency: 15m
-                default: true
-            modules:
-              - name: memcached
-                path: modules/databases/kv/memcached/metrics.alloy
-              - name: loki
-                path: modules/databases/timeseries/loki/metrics.alloy
-              - name: mimir
-                path: modules/databases/timeseries/mimir/metrics.alloy
-              - name: tempo
-                path: modules/databases/timeseries/tempo/metrics.alloy
-              - name: grafana
-                path: modules/ui/grafana/metrics.alloy
-          cost:
-            enabled: false
-
-        traces:
+        clusterMetrics:
           enabled: true
+          apiServer:
+            enabled: true
+          cadvisor:
+            enabled: true
+          controlPlane:
+            enabled: true
+          kube-state-metrics:
+            deploy: true
+            enabled: true
+          kubeControllerManager:
+            enabled: true
+          kubeProxy:
+            enabled: true
+          kubeScheduler:
+            enabled: true
+          kubeletResource:
+            enabled: true
+          node-exporter:
+            enabled: true
+            metricsTuning:
+              useIntegrationAllowList: true
 
-        receivers:
-          jaeger:
+        clusterEvents:
+          enabled: true
+        podLogs:
+          enabled: true
+        prometheusOperatorObjects:
+          enabled: true
+        applicationObservability:
+          enabled: true
+          receivers:
             grpc:
               enabled: true
-            thriftBinary:
-              enabled: true
-            thriftCompact:
-              enabled: true
-            thriftHttp:
-              enabled: true
-          grafanaCloudMetrics:
-            enabled: false
-          deployGrafanaAgentService: false
 
-        opencost:
-          enabled: false
+        alloy-metrics:
+          enabled: true
+        alloy-singleton:
+          enabled: true
+        alloy-logs:
+          enabled: true
+        alloy-receiver:
+          enabled: true
+          alloy:
+            extraPorts:
+              - name: otlp-grpc
+                port: 4317
+                targetPort: 4317
+                protocol: TCP
 
-        prometheus-operator-crds:
-          enabled: false
-
-        alloy:
-          controller:
-            replicas: 3
   destination:
     server: https://kubernetes.default.svc
     namespace: k8s-monitoring
